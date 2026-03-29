@@ -1,0 +1,389 @@
+# Supplementary Theory Note
+
+## 1. Relation to the paper
+
+This note rewrites the main theoretical argument of the paper in a more self-contained form. Its purpose is to make the dependency chain in Theorem 4.1 easier to audit by separating:
+
+1. the local regularity assumptions used by the descriptor and direction maps,
+2. the kernel-bank / mixing sensitivity decomposition,
+3. the induced one-step operator bound, and
+4. the resulting rollout-error recursion under autoregressive composition.
+
+This note does **not** broaden the scope of the paper’s theoretical claim. It remains a **local**, **controlled** statement for the present graph-based autoregressive rollout simulator studied in the paper, rather than a global theorem for arbitrary dynamical systems.
+
+We use the same notation as in the paper. In particular:
+
+- the learned one-step operator is defined by Eq. (2)–(3),
+- the relative quantities used to build the descriptor are given by Eq. (4),
+- the kernel-bank mixture is defined by Eq. (5)–(8),
+- the main local gain decomposition is Eq. (9), and
+- the rollout recursion is Eq. (10)–(11).
+
+---
+
+## 2. Notation and local rollout neighborhood
+
+Let
+$$
+S^t = \{s_i^t\}_{i=1}^N, \qquad s_i^t = [x_i^t, v_i^t]
+$$
+denote the joint state at discrete time $t$, where $x_i^t$ is position and $v_i^t$ is velocity.
+
+The learned world model updates accelerations by message passing:
+$$
+a_i^t = \sum_{j \in \mathcal{N}(i)} m_{ij}^t
+$$
+followed by the fixed kinematic update:
+$$
+\begin{aligned}
+v_i^{t+1} &= v_i^t + \Delta t\, a_i^t \\
+x_i^{t+1} &= x_i^t + \Delta t\, v_i^t + \tfrac12 (\Delta t)^2 a_i^t
+\end{aligned}
+$$
+
+For each edge $(i,j)$, define the relative quantities:
+$$
+r_{ij}^t = x_j^t - x_i^t, \qquad
+v_{ij}^t = v_j^t - v_i^t, \qquad
+d_{ij}^t = \|r_{ij}^t\|
+$$
+$$
+\hat r_{ij}^t = \frac{r_{ij}^t}{d_{ij}^t + \varepsilon}, \qquad
+u_{ij}^t = \langle \hat r_{ij}^t, v_{ij}^t \rangle
+$$
+
+The descriptor is
+$$
+z_{ij}^t = g(s_i^t, s_j^t),
+$$
+where $g$ is the low-dimensional descriptor map used in the paper.
+
+We work on the same local rollout neighborhood $\mathcal U$ used in Theorem 4.1 and Appendix C.1. On $\mathcal U$, assumptions (C1)–(C4) of Theorem 4.1 hold, and the local descriptor-map Lipschitz constant $L_g$ introduced in Eq. (21) is well defined.
+
+---
+
+## 3. Lemma 1: Local regularity of the descriptor and direction maps
+
+### Lemma 1
+
+Let $\mathcal U$ be the local rollout neighborhood used in Theorem 4.1 and Appendix C.1.
+
+Assume:
+
+- the stabilized direction map $\hat r_{ij}$ is bounded and locally Lipschitz on $\mathcal U$,
+- $L_g$ denotes the local Lipschitz constant of the descriptor map $g$ on $\mathcal U$, in the sense of Eq. (21).
+
+Then for any two joint states $u, v \in \mathcal U$ and any edge $(i,j)$ common to both states under the neighborhood construction,
+$$
+\| z_{ij}(u) - z_{ij}(v) \| \le L_g \|u - v\|
+$$
+and
+$$
+\| \hat r_{ij}(u) - \hat r_{ij}(v) \| \le L_{\mathrm{dir}} \|u - v\|
+$$
+for some finite local constant $L_{\mathrm{dir}}$.
+
+### Proof
+
+The first inequality is exactly the local descriptor-map regularity introduced in Eq. (21) of Appendix C.1.
+
+The second follows from condition (C4) of Theorem 4.1, which assumes that the stabilized direction map is bounded and locally Lipschitz on the rollout neighborhood.
+
+### Remark
+
+This lemma only records the local regularity already used by the paper. It does **not** claim global Lipschitzness of the descriptor map or global control over arbitrary graph-topology changes.
+
+---
+
+## 4. Lemma 2: Kernel-bank mixture sensitivity decomposition
+
+For each edge descriptor $z$, define:
+
+- the kernel-bank response vector:
+  $$
+  \kappa(z) = [\kappa_1(z), \ldots, \kappa_M(z)]
+  $$
+- the coefficient map:
+  $$
+  \alpha(z)
+  $$
+- the scalar interaction map:
+  $$
+  \phi_\theta(z) = \langle \alpha(z), \kappa(z) \rangle
+  $$
+
+Assume that on $\mathcal U$:
+
+- each primitive is bounded and locally Lipschitz:
+  $$
+  |\kappa_m(z)| \le B_{\kappa_m}
+  $$
+  $$
+  |\kappa_m(z) - \kappa_m(z')| \le L_{\kappa_m}\|z - z'\|
+  $$
+
+- the coefficient map is bounded in $\ell_1$:
+  $$
+  \|\alpha(z)\|_1 \le A
+  $$
+
+- the coefficient map is locally Lipschitz in $\ell_1$:
+  $$
+  \|\alpha(z) - \alpha(z')\|_1 \le L_\alpha \|z - z'\|
+  $$
+
+Define
+$$
+B_\kappa := \max_m B_{\kappa_m}, \qquad
+L_\kappa := \max_m L_{\kappa_m}.
+$$
+
+### Lemma 2
+
+Under the assumptions above, the scalar interaction map $\phi_\theta(z)$ is locally Lipschitz in descriptor space, with
+$$
+|\phi_\theta(z) - \phi_\theta(z')|
+\le
+\big(A L_\kappa + B_\kappa L_\alpha\big)\|z - z'\|.
+$$
+
+Equivalently, letting
+$$
+L_{\mathrm{bank}} := A L_\kappa, \qquad
+L_{\mathrm{mix}} := B_\kappa L_\alpha,
+$$
+we have
+$$
+L_\phi \le L_{\mathrm{bank}} + L_{\mathrm{mix}}.
+$$
+
+### Proof
+
+For any $z, z'$,
+$$
+\phi_\theta(z) - \phi_\theta(z')
+=
+\langle \alpha(z), \kappa(z) - \kappa(z') \rangle
++
+\langle \alpha(z) - \alpha(z'), \kappa(z') \rangle.
+$$
+
+Taking absolute values and applying Hölder’s inequality in $(\ell_1,\ell_\infty)$ gives
+$$
+|\phi_\theta(z) - \phi_\theta(z')|
+\le
+\|\alpha(z)\|_1 \|\label{\kappa}(z) - \kappa(z')\|_\infty
++
+\|\alpha(z) - \alpha(z')\|_1 \|\kappa(z')\|_\infty.
+$$
+
+By the assumptions,
+$$
+\|\alpha(z)\|_1 \le A,
+\qquad
+\|\kappa(z) - \kappa(z')\|_\infty \le L_\kappa \|z - z'\|,
+$$
+$$
+\|\alpha(z) - \alpha(z')\|_1 \le L_\alpha \|z - z'\|,
+\qquad
+\|\kappa(z')\|_\infty \le B_\kappa.
+$$
+
+Substituting gives
+$$
+|\phi_\theta(z) - \phi_\theta(z')|
+\le
+\big(A L_\kappa + B_\kappa L_\alpha\big)\|z - z'\|,
+$$
+which proves the claim.
+
+### Remark
+
+This is the same bank/mixing decomposition used in Eq. (9) of the main paper and Eq. (20) of Appendix C.1; the point here is only to restate it as a standalone lemma.
+
+---
+
+## 5. Lemma 3: Induced one-step operator bound
+
+For each edge, define
+$$
+s_{ij} = \phi_\theta(z_{ij})
+$$
+and the vector message
+$$
+m_{ij} = s_{ij}\,\hat r_{ij}.
+$$
+
+### Lemma 3
+
+Under the assumptions of Lemma 1 and Lemma 2, there exist finite local constants $C_{\mathrm{dir}}$ and $C_{\mathrm{agg,kin}}$, depending on the rollout neighborhood, the stabilization constant, the local active neighborhood regime, and the fixed kinematic update, such that the induced one-step learned operator $\hat F$ is locally Lipschitz on $\mathcal U$ with
+$$
+L_{\mathrm{PHYSICK}}
+\le
+C_{\mathrm{agg,kin}}\, L_g \big(L_{\mathrm{bank}} + L_{\mathrm{mix}}\big) + C_{\mathrm{dir}}.
+$$
+
+### Proof
+
+Fix two joint states $u, v \in \mathcal U$.
+
+By Lemma 1,
+$$
+\|z_{ij}(u) - z_{ij}(v)\| \le L_g \|u - v\|.
+$$
+
+Applying Lemma 2 to the scalar interaction map gives
+$$
+|s_{ij}(u) - s_{ij}(v)|
+=
+|\phi_\theta(z_{ij}(u)) - \phi_\theta(z_{ij}(v))|
+\le
+L_g \big(L_{\mathrm{bank}} + L_{\mathrm{mix}}\big)\|u - v\|.
+$$
+
+Now decompose the message difference:
+$$
+m_{ij}(u) - m_{ij}(v)
+=
+\big(s_{ij}(u) - s_{ij}(v)\big)\hat r_{ij}(u)
++
+s_{ij}(v)\big(\hat r_{ij}(u) - \hat r_{ij}(v)\big).
+$$
+
+Because $\|\hat r_{ij}(u)\| \le 1$, the first term is controlled by the scalar interaction bound above.
+
+Because the stabilized direction map is locally Lipschitz on $\mathcal U$, and because the scalar interaction magnitude is locally bounded on $\mathcal U$, the second term is bounded by a finite local constant times $\|u - v\|$. Collect these direction-dependent contributions into $C_{\mathrm{dir}}$.
+
+Accelerations are obtained by sum aggregation over neighbors, so the message-level bound lifts to the acceleration update with a neighborhood-dependent factor. The kinematic update is fixed and therefore Lipschitz on any bounded neighborhood. Collecting the aggregation and kinematic factors into $C_{\mathrm{agg,kin}}$ yields
+$$
+L_{\mathrm{PHYSICK}}
+\le
+C_{\mathrm{agg,kin}}\, L_g \big(L_{\mathrm{bank}} + L_{\mathrm{mix}}\big) + C_{\mathrm{dir}},
+$$
+which is the explicit lifted bound stated in Appendix C.1.
+
+### Remark
+This lemma is still local. It does **not** claim a graph-family-independent global constant, and it does **not** remove the dependence on the rollout neighborhood or active aggregation regime.
+
+---
+
+## 6. Corollary: Local rollout-error recursion and derived gain condition
+
+Let $F$ denote the ground-truth one-step dynamics operator and $\hat F$ the learned one-step operator.
+
+Consider the ground-truth evolution
+$$
+S^{t+1} = F(S^t)
+$$
+and the autoregressive learned rollout
+$$
+\hat S^{t+1} = \hat F(\hat S^t).
+$$
+
+Define the rollout error
+$$
+e_t = \hat S^t - S^t
+$$
+and the one-step modeling discrepancy on the ground-truth trajectory
+$$
+\delta_t = \|\hat F(S^t) - F(S^t)\|.
+$$
+
+### Corollary 1 (Local rollout-error recursion)
+
+If the learned operator $\hat F$ is locally Lipschitz on $\mathcal U$ with constant $L_{\mathrm{PHYSICK}}$, then
+$$
+\|e_{t+1}\| \le L_{\mathrm{PHYSICK}} \|e_t\| + \delta_t.
+$$
+
+Consequently, for any horizon $H \ge 1$,
+$$
+\|e_H\|
+\le
+L_{\mathrm{PHYSICK}}^H \|e_0\|
++
+\sum_{k=0}^{H-1} L_{\mathrm{PHYSICK}}^{H-1-k} \delta_k.
+$$
+
+### Proof
+
+By adding and subtracting $\hat F(S^t)$,
+$$
+e_{t+1}
+=
+\hat F(\hat S^t) - F(S^t)
+=
+\big(\hat F(\hat S^t) - \hat F(S^t)\big)
++
+\big(\hat F(S^t) - F(S^t)\big).
+$$
+
+Taking norms and using local Lipschitzness of $\hat F$,
+$$
+\|e_{t+1}\|
+\le
+\|\hat F(\hat S^t) - \hat F(S^t)\|
++
+\|\hat F(S^t) - F(S^t)\|
+\le
+L_{\mathrm{PHYSICK}} \|e_t\| + \delta_t.
+$$
+
+Unrolling the recursion yields the horizon-$H$ bound.
+
+### Corollary 2 (Derived local gain interpretation under an additional assumption)
+
+The following is an immediate derived consequence of Corollary 1 under the **additional** assumption that the local one-step gain is bounded by some $\rho < 1$ on the rollout neighborhood:
+$$
+L_{\mathrm{PHYSICK}} \le \rho < 1.
+$$
+
+Then
+$$
+\|e_H\|
+\le
+\rho^H \|e_0\|
++
+\sum_{k=0}^{H-1} \rho^{H-1-k} \delta_k.
+$$
+
+If, in addition, $\delta_t \le \bar\delta$ for all $t$ in the considered horizon, then
+$$
+\|e_H\|
+\le
+\rho^H \|e_0\|
++
+\frac{1 - \rho^H}{1 - \rho}\,\bar\delta.
+$$
+
+In particular, if $e_0 = 0$, then
+$$
+\|e_H\|
+\le
+\frac{1 - \rho^H}{1 - \rho}\,\bar\delta.
+$$
+
+### Proof
+The first bound follows immediately from Corollary 1 by replacing $L_{\mathrm{PHYSICK}}$ with the upper bound $\rho$.
+
+The second follows by bounding each $\delta_k$ by $\bar\delta$ and summing the geometric series.
+
+### Interpretation
+
+This corollary should be read as a **derived local gain interpretation**, not as a global closed-loop stability theorem. It states only that if the induced one-step gain stays below one on the local rollout neighborhood, then existing rollout error is contractively propagated there, while fresh model discrepancy accumulates through the usual geometric weighting.
+
+---
+
+## 7. What this note does not claim
+
+This note does **not** claim any of the following:
+
+1. **No global theorem for arbitrary dynamical systems.** The analysis remains local and tied to the current graph-based autoregressive rollout simulator.
+
+2. **No blanket superiority over all simulator families.** The paper’s empirical and theoretical scope is the present message-passing rollout family in which the backbone, graph construction, and training protocol are fixed and only the edge interaction operator is changed.
+
+3. **No higher-order interaction guarantee.** The note does not establish results for clique-based, hypergraph, mesh-based, or other higher-order interaction structures beyond the pairwise setting studied in the paper.
+
+4. **No automatic control of graph-topology changes outside the local regime.** The argument is local on the rollout neighborhood and should not be read as a global statement across arbitrary neighborhood-switching events.
+
+5. **No claim that local Lipschitzness itself is the novelty.** The technical point used here is the local sensitivity decomposition in Eq. (9), together with its lift to the one-step operator in Eq. (23), for the structured interaction law studied in this paper.
